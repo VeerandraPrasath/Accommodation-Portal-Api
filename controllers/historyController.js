@@ -280,11 +280,15 @@ export const getAllRequests = async (req, res) => {
         r.id,
         r.date_from AS start_time,
         r.date_to AS end_time,
+        r.check_in,
+        r.check_out,
         r.status,
         r.remarks,
         r.timestamp AS created_at,
         r.processed_at,
         r.city_id,
+        r.booking_type,
+        r.booking_for,
         aa.apartment_id,
         aa.flat_id,
         aa.room_id,
@@ -294,7 +298,12 @@ export const getAllRequests = async (req, res) => {
           'name', u.name,
           'email', u.email,
           'role', u.role
-        ) AS user
+        ) AS user,
+        (
+          SELECT COALESCE(json_agg(email), '[]'::json)
+          FROM team_members
+          WHERE request_id = r.id
+        ) AS team_members
       FROM requests r
       JOIN users u ON u.id = r.user_id
       LEFT JOIN assigned_accommodations aa ON aa.request_id = r.id

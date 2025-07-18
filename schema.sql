@@ -63,9 +63,9 @@ CREATE TABLE IF NOT EXISTS requests (
     remarks TEXT,
     date_from DATE NOT NULL,
     date_to DATE NOT NULL,
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     check_in TIMESTAMP,
     check_out TIMESTAMP,
+    booking_for VARCHAR(100), -- added to track who the booking is for (only for individual)
     processed_at TIMESTAMP
 );
 

@@ -140,37 +140,29 @@ function formatAssignment(row) {
 
 
 export const createBooking = async (req, res) => {
-  
   const {
     user,            // { id, name, email, role }
     city,            // city name
     dates,           // { from: 'YYYY-MM-DD', to: 'YYYY-MM-DD' }
     checkInTime,     // 'HH:mm'
     checkOutTime,    // 'HH:mm'
-    bookingType,     // 'individual' or 'team'
+    bookingType,
+    bookingFor,     // 'individual' or 'team'
     remarks = null,
     teamMembers = [] // array of emails (only if bookingType is team)
   } = req.body;
 
   try {
-    const fromDate = dayjs(`${dates.from}T${checkInTime}`);
-    const toDate = dayjs(`${dates.to}T${checkOutTime}`);
+    // Combine date and time strings manually
+    const checkIn = `${dates.from} ${checkInTime}`;     // e.g., '2025-07-20 08:00'
+    const checkOut = `${dates.to} ${checkOutTime}`;     // e.g., '2025-07-24 10:00'
 
-    const today1 = new Date();
-const [hours1, minutes1] = checkInTime.split(":").map(Number);
+    const fromDate = new Date(dates.from);
+    const toDate = new Date(dates.to);
 
-// Create a new Date object with today's date and the given time
-const check_in_Timestamp = new Date(today1.getFullYear(), today1.getMonth(), today1.getDate(), hours1, minutes1);
+    const durationInDays = (toDate - fromDate) / (1000 * 60 * 60 * 24);
 
-
-const today = new Date();
-const [hours, minutes] = checkOutTime.split(":").map(Number);
-
-// Create a new Date object with today's date and the given time
-const check_out_timestamp = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes);
-
-
-    if (toDate.diff(fromDate, 'day') > 14) {
+    if (durationInDays > 14) {
       return res.status(400).json({
         success: false,
         message: 'Validation error: Maximum stay is 14 days.'
@@ -195,18 +187,19 @@ const check_out_timestamp = new Date(today.getFullYear(), today.getMonth(), toda
     const insertRequest = await pool.query(
       `INSERT INTO requests (
          user_id, city_id, booking_type, remarks,
-         date_from, date_to,check_in,check_out
-       ) VALUES ($1, $2, $3, $4, $5, $6,$7,$8)
+         date_from, date_to, check_in, check_out,booking_for
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7::timestamp, $8::timestamp,$9)
        RETURNING id`,
       [
         user.id,
         cityId,
         bookingType,
         remarks,
-        fromDate.toDate(),
-        toDate.toDate(),
-        check_in_Timestamp,
-        check_out_timestamp
+        dates.from,
+        dates.to,
+        checkIn,
+        checkOut,
+        bookingFor
       ]
     );
 

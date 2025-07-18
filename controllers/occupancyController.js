@@ -2,8 +2,8 @@ import pool from '../db.js';
 // const ExcelJS = require('exceljs');
 import ExcelJS from 'exceljs';
 
-export const getOccupancy=async (req, res) => {
-  const { city, apartment, status } = req.query;
+export const getOccupancy = async (req, res) => {
+  const { city, apartment, is_booked } = req.query;
 
   const query = `
     SELECT 
@@ -14,7 +14,7 @@ export const getOccupancy=async (req, res) => {
       u.name AS occupant,
       b.check_in AS "checkIn",
       b.check_out AS "checkOut",
-      b.status,
+      b.is_booked,
       u.role
     FROM beds b
     JOIN rooms r ON b.room_id = r.id
@@ -25,7 +25,7 @@ export const getOccupancy=async (req, res) => {
     WHERE 
       ($1::text IS NULL OR c.name = $1)
       AND ($2::text IS NULL OR a.name = $2)
-      AND ($3::text IS NULL OR b.status = $3)
+      AND ($3::boolean IS NULL OR b.is_booked = $3)
     ORDER BY a.name, f.name, r.name, b.name
   `;
 
@@ -33,7 +33,7 @@ export const getOccupancy=async (req, res) => {
     const { rows } = await pool.query(query, [
       city || null,
       apartment || null,
-      status || null
+      is_booked !== undefined ? is_booked === 'true' : null
     ]);
 
     res.json({ success: true, data: rows });
@@ -41,7 +41,9 @@ export const getOccupancy=async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
-}
+};
+
+
 export const exportOccupancy= async (req, res) => {
   const { city, apartment, status } = req.body.filters || {};
 
