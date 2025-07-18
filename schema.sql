@@ -1,15 +1,15 @@
--- ENUM TYPES
+-- ENUM TYPES (unchanged)
 CREATE TYPE request_status AS ENUM ('pending', 'approved', 'rejected');
 CREATE TYPE booking_type AS ENUM ('individual', 'team');
 
 -- 1. CITIES
-CREATE TABLE cities (
+CREATE TABLE IF NOT EXISTS cities (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE
 );
 
--- 2. USERS (moved up)
-CREATE TABLE users (
+-- 2. USERS
+CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
@@ -17,7 +17,7 @@ CREATE TABLE users (
 );
 
 -- 3. APARTMENTS
-CREATE TABLE apartments (
+CREATE TABLE IF NOT EXISTS apartments (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     city_id INT REFERENCES cities(id) ON DELETE CASCADE,
@@ -25,34 +25,36 @@ CREATE TABLE apartments (
 );
 
 -- 4. FLATS
-CREATE TABLE flats (
+CREATE TABLE IF NOT EXISTS flats (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    apartment_id INT REFERENCES apartments(id) ON DELETE CASCADE
+    apartment_id INT REFERENCES apartments(id) ON DELETE CASCADE,
+    is_booked BOOLEAN DEFAULT FALSE
 );
 
 -- 5. ROOMS
-CREATE TABLE rooms (
+CREATE TABLE IF NOT EXISTS rooms (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    flat_id INT REFERENCES flats(id) ON DELETE CASCADE
+    flat_id INT REFERENCES flats(id) ON DELETE CASCADE,
+    is_booked BOOLEAN DEFAULT FALSE
 );
 
--- 6. BEDS
-CREATE TABLE beds (
+-- 6. BEDS (Cottages)
+CREATE TABLE IF NOT EXISTS beds (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     room_id INT REFERENCES rooms(id) ON DELETE CASCADE,
-    
     status VARCHAR(20), -- 'occupied', 'available', 'maintenance'
     blocked_by VARCHAR(100),
     occupant_id INT REFERENCES users(id),
     check_in DATE,
-    check_out DATE
+    check_out DATE,
+    is_booked BOOLEAN DEFAULT FALSE
 );
 
 -- 7. BOOKING REQUESTS
-CREATE TABLE requests (
+CREATE TABLE IF NOT EXISTS requests (
     id SERIAL PRIMARY KEY,
     user_id INT REFERENCES users(id) ON DELETE CASCADE,
     city_id INT REFERENCES cities(id),
@@ -62,18 +64,20 @@ CREATE TABLE requests (
     date_from DATE NOT NULL,
     date_to DATE NOT NULL,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    check_in TIMESTAMP,
+    check_out TIMESTAMP,
     processed_at TIMESTAMP
 );
 
 -- 8. TEAM MEMBERS
-CREATE TABLE team_members (
+CREATE TABLE IF NOT EXISTS team_members (
     id SERIAL PRIMARY KEY,
     request_id INT REFERENCES requests(id) ON DELETE CASCADE,
     email VARCHAR(100) NOT NULL
 );
 
 -- 9. ASSIGNED ACCOMMODATIONS
-CREATE TABLE assigned_accommodations (
+CREATE TABLE IF NOT EXISTS assigned_accommodations (
     id SERIAL PRIMARY KEY,
     request_id INT REFERENCES requests(id) ON DELETE CASCADE,
     user_email VARCHAR(100) NOT NULL,

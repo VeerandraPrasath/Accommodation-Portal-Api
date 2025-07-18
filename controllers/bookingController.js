@@ -156,6 +156,20 @@ export const createBooking = async (req, res) => {
     const fromDate = dayjs(`${dates.from}T${checkInTime}`);
     const toDate = dayjs(`${dates.to}T${checkOutTime}`);
 
+    const today1 = new Date();
+const [hours1, minutes1] = checkInTime.split(":").map(Number);
+
+// Create a new Date object with today's date and the given time
+const check_in_Timestamp = new Date(today1.getFullYear(), today1.getMonth(), today1.getDate(), hours1, minutes1);
+
+
+const today = new Date();
+const [hours, minutes] = checkOutTime.split(":").map(Number);
+
+// Create a new Date object with today's date and the given time
+const check_out_timestamp = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes);
+
+
     if (toDate.diff(fromDate, 'day') > 14) {
       return res.status(400).json({
         success: false,
@@ -181,8 +195,8 @@ export const createBooking = async (req, res) => {
     const insertRequest = await pool.query(
       `INSERT INTO requests (
          user_id, city_id, booking_type, remarks,
-         date_from, date_to
-       ) VALUES ($1, $2, $3, $4, $5, $6)
+         date_from, date_to,check_in,check_out
+       ) VALUES ($1, $2, $3, $4, $5, $6,$7,$8)
        RETURNING id`,
       [
         user.id,
@@ -190,7 +204,9 @@ export const createBooking = async (req, res) => {
         bookingType,
         remarks,
         fromDate.toDate(),
-        toDate.toDate()
+        toDate.toDate(),
+        check_in_Timestamp,
+        check_out_timestamp
       ]
     );
 

@@ -1,6 +1,7 @@
 // controllers/bookingsController.js
 import pool from '../db.js';
-
+import db from '../db.js';
+import dayjs from 'dayjs';
 // controllers/bookingsController.js
 import { Parser } from 'json2csv'; // for CSV export
 
@@ -287,7 +288,7 @@ export const getAllRequests = async (req, res) => {
         aa.apartment_id,
         aa.flat_id,
         aa.room_id,
-        NULL AS cottage_id,
+        aa.bed_id AS cottage_id,
         json_build_object(
           'id', u.id,
           'name', u.name,
@@ -330,75 +331,92 @@ export const approveRequest = async (req, res) => {
     apartment_id,
     flat_id,
     room_id,
-    cottage_id,
-    remarks,
-    assigned_by // optional, not used in this example unless you want audit logs
+    bed_id,
+    remarks
   } = req.body;
 
   try {
-    // 1. Update request status and remarks
-    const updateQuery = `
-      UPDATE requests
-      SET status = 'approved',
-          remarks = $1,
-          processed_at = NOW()
-      WHERE id = $2
-      RETURNING id, status, remarks
-    `;
-    const updateResult = await pool.query(updateQuery, [remarks || null, requestId]);
+    // Step 1: Fetch the request
+    const requestRes = await db.query(
+      `SELECT * FROM requests WHERE id = $1`,
+      [requestId]
+    );
 
-    if (updateResult.rowCount === 0) {
-      return res.status(404).json({ success: false, message: "Request not found" });
+    if (requestRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Request not found' });
     }
 
-    // 2. Get user email for assignment
-    const userResult = await pool.query(`
-      SELECT u.email, r.city_id
-      FROM requests r
-      JOIN users u ON r.user_id = u.id
-      WHERE r.id = $1
-    `, [requestId]);
+    const request = requestRes.rows[0];
 
-    const { email, city_id } = userResult.rows[0];
+    // Step 2: Fetch user email (from the users table)
+    const userRes = await db.query(`SELECT email FROM users WHERE id = $1`, [request.user_id]);
+    const userEmail = userRes.rows[0]?.email;
 
-    // 3. Insert into assigned_accommodations
-    await pool.query(`
-      INSERT INTO assigned_accommodations (
-        request_id, user_email, city_id,
-        apartment_id, flat_id, room_id, bed_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, NULL)
-    `, [
-      requestId,
-      email,
-      city_id,
-      apartment_id || null,
-      flat_id || null,
-      room_id || null
-    ]);
+    if (!userEmail) {
+      return res.status(400).json({ success: false, message: 'User email not found for request.' });
+    }
 
-    // 4. Respond with the structured output
-    res.status(200).json({
+    // Step 3: Mark appropriate level as booked
+    if (bed_id) {
+      await db.query(`UPDATE beds SET is_booked = true WHERE id = $1`, [bed_id]);
+    } else if (room_id) {
+      await db.query(`UPDATE rooms SET is_booked = true WHERE id = $1`, [room_id]);
+    } else if (flat_id) {
+      await db.query(`UPDATE flats SET is_booked = true WHERE id = $1`, [flat_id]);
+    }
+
+    // Step 4: Update request status only
+    const processedAt = new Date();
+    await db.query(
+      `UPDATE requests
+       SET status = 'approved', remarks = $1, processed_at = $2
+       WHERE id = $3`,
+      [remarks, processedAt, requestId]
+    );
+
+    // Step 5: Insert into assigned_accommodations
+    await db.query(
+      `INSERT INTO assigned_accommodations
+        (request_id, user_email, city_id, apartment_id, flat_id, room_id, bed_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        requestId,
+        userEmail,
+        request.city_id,
+        apartment_id || null,
+        flat_id || null,
+        room_id || null,
+        bed_id || null
+      ]
+    );
+
+    // Step 6: Final response
+    const updatedRequest = {
+      id: requestId,
+      status: "approved",
+      apartment_id,
+      flat_id,
+      room_id,
+      bed_id,
+      remarks
+    };
+
+    return res.status(200).json({
       success: true,
       message: "Request approved.",
-      request: {
-        id: requestId,
-        status: 'approved',
-        apartment_id: apartment_id || null,
-        flat_id: flat_id || null,
-        room_id: room_id || null,
-        cottage_id: cottage_id || null, // this is not in your DB, but included in response
-        remarks: remarks || null
-      }
+      request: updatedRequest
     });
+
   } catch (error) {
-    console.error('Error approving request:', error);
-    res.status(500).json({
+    console.error("Error approving request:", error);
+    return res.status(500).json({
       success: false,
-      message: "Failed to approve request",
-      error: error.message
+      message: "An error occurred while approving the request"
     });
   }
 };
+
+
 
 export const rejectRequest = async (req, res) => {
   const requestId = parseInt(req.params.id);

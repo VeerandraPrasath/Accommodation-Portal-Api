@@ -77,16 +77,29 @@ export const deleteCity=async (req, res) => {
   }
 }
 
+
 export const getCityAccommodations = async (req, res) => {
   const cityId = req.params.cityId;
 
   try {
     const apartmentsRes = await pool.query(`
-      SELECT a.id AS apartment_id, a.name AS apartment_name, a.google_map_link,
-             f.id AS flat_id, f.name AS flat_name,
-             r.id AS room_id, r.name AS room_name,
-             b.id AS bed_id, b.name AS bed_name,
-             b.status, b.check_out
+      SELECT 
+        a.id AS apartment_id, 
+        a.name AS apartment_name, 
+        a.google_map_link,
+
+        f.id AS flat_id, 
+        f.name AS flat_name,
+        f.is_booked AS flat_booked,
+
+        r.id AS room_id, 
+        r.name AS room_name,
+        r.is_booked AS room_booked,
+
+        b.id AS bed_id, 
+        b.name AS bed_name,
+        b.is_booked AS bed_booked
+
       FROM apartments a
       LEFT JOIN flats f ON f.apartment_id = a.id
       LEFT JOIN rooms r ON r.flat_id = f.id
@@ -97,8 +110,6 @@ export const getCityAccommodations = async (req, res) => {
 
     const rows = apartmentsRes.rows;
     const apartmentsMap = {};
-
-    const now = dayjs();
 
     for (const row of rows) {
       const aptId = row.apartment_id;
@@ -118,7 +129,7 @@ export const getCityAccommodations = async (req, res) => {
         flat = {
           id: row.flat_id,
           name: row.flat_name,
-          is_booked: false,
+          is_booked: row.flat_booked ?? false,
           rooms: []
         };
         apartment.flats.push(flat);
@@ -130,37 +141,30 @@ export const getCityAccommodations = async (req, res) => {
           room = {
             id: row.room_id,
             name: row.room_name,
-            is_booked: false,
+            is_booked: row.room_booked ?? false,
             cottages: []
           };
           flat.rooms.push(room);
         }
 
         if (row.bed_id) {
-          const isBedBooked = row.status === 'occupied' || (row.check_out && dayjs(row.check_out).isAfter(now));
           room.cottages.push({
             id: row.bed_id,
             name: row.bed_name,
-            is_booked: isBedBooked
+            is_booked: row.bed_booked ?? false
           });
-
-          if (isBedBooked) {
-            room.is_booked = true;
-            flat.is_booked = true;
-          }
         }
       }
     }
 
-    const result = Object.values(apartmentsMap);
-
     res.json({
       success: true,
-      apartments: result
+      apartments: Object.values(apartmentsMap)
     });
   } catch (error) {
     console.error('Error fetching accommodations:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
+
 

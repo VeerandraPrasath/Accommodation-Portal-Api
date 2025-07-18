@@ -99,8 +99,8 @@ app.use('/api/bookings',bookingRoutes)
 app.use('/api/requests',historiesRoute)
 app.use('/api/accommodation',accommodationsRoute)
 app.use('/api/beds',bedRoutes);
-app.listen(5000, () => {
-  console.log("✅ Server running on http://localhost:5000");
+app.listen(5001, () => {
+  console.log("✅ Server running on http://localhost:5001");
 });
 
 

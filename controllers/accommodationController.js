@@ -28,3 +28,53 @@ export const getApartmentsByCityIdGrouped = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
+
+
+export const getHierarchy = async (req, res) => {
+  try {
+    const citiesResult = await pool.query('SELECT id, name FROM cities');
+    const apartmentsResult = await pool.query('SELECT id, name, city_id, google_map_link FROM apartments');
+    const flatsResult = await pool.query('SELECT id, name, apartment_id FROM flats');
+    
+    // For rooms, we count number of beds per room
+    const roomsResult = await pool.query(`
+      SELECT r.id, r.name, r.flat_id, COUNT(b.id) AS beds
+      FROM rooms r
+      LEFT JOIN beds b ON r.id = b.room_id
+      GROUP BY r.id
+    `);
+
+    const bedsResult = await pool.query(`
+      SELECT id, name, room_id, status, blocked_by
+      FROM beds
+    `);
+
+    res.json({
+      success: true,
+      hierarchy: {
+        cities: citiesResult.rows,
+        apartments: apartmentsResult.rows.map(a => ({
+          id: a.id,
+          name: a.name,
+          city_id: a.city_id,
+          googleMapLink: a.google_map_link
+        })),
+        flats: flatsResult.rows.map(f => ({
+          id: f.id,
+          name: f.name,
+          apartment_id: f.apartment_id
+        })),
+        rooms: roomsResult.rows.map(r => ({
+          id: r.id,
+          name: r.name,
+          flat_id: r.flat_id,
+          beds: parseInt(r.beds)
+        })),
+        beds: bedsResult.rows
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching hierarchy:', error);
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
